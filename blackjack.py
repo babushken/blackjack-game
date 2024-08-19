@@ -1,115 +1,153 @@
 """
-Blackjack Terminal Game
-Description: A terminal-style blackjack game.
-Author: babushken
+a terminal-style blackjack game.
+made by babushken.
 """
 
 import random
 
-class Card:
-    def __init__(self, suit, value):
-        self.suit = suit
-        self.value = value
-    
-    def __repr__(self):
-        return f"{self.value} of {self.suit}"
-    
-    def display(self):
-        suits_symbols = {'Hearts': '♥', 'Diamonds': '♦', 'Clubs': '♣', 'Spades': '♠'}
-        suit_symbol = suits_symbols.get(self.suit, '?')
-        value_display = self.value if len(self.value) == 2 else f" {self.value}"
-        return f"""
- _______
-|{value_display}     |
-|   {suit_symbol}   |
-|     {value_display}|
- -------
-"""
+def create_deck():
+    suits = ['♠', '♥', '♦', '♣']
+    ranks = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A']
+    return [(suit, rank) for suit in suits for rank in ranks]
 
-class Deck:
-    def __init__(self):
-        self.cards = [Card(suit, value) for suit in ['Hearts', 'Diamonds', 'Clubs', 'Spades'] 
-                for value in ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A']]
-        self.shuffle()
-    
-    def shuffle(self):
-        random.shuffle(self.cards)
-    
-    def deal(self):
-        if len(self.cards) == 0:
-            raise ValueError("All cards have been dealt.")
-        return self.cards.pop()
+def card_value(rank):
+    if rank in ['J', 'Q', 'K']:
+        return 10
+    elif rank == 'A':
+        return 11
+    else:
+        return int(rank)
 
-class Player:
-    def __init__(self):
-        self.hand = []
-        self.money = 888
-    
-    def add_card(self, card):
-        self.hand.append(card)
-    
-    def show_hand(self):
-        return '\n'.join(card.display() for card in self.hand)
-    
-    def total_value(self):
-        value_map = {'2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9, '10': 10, 'J': 10, 'Q': 10, 'K': 10, 'A': 11}
-        total = 0
-        aces = 0
+def hand_value(hand):
+    value = sum(card_value(rank) for suit, rank in hand)
+    num_aces = sum(1 for suit, rank in hand if rank == 'A')
+    while value > 21 and num_aces:
+        value -= 10
+        num_aces -= 1
+    return value
 
-        for card in self.hand:
-            total += value_map[card.value]
-            if card.value == 'A':
-                aces += 1
-        
-        while total > 21 and aces:
-            total -= 10
-            aces -= 1
-        
-        return total
+def draw_card(deck):
+    return deck.pop()
+
+def initial_deal(deck):
+    return [draw_card(deck), draw_card(deck)]
+
+def print_card(card):
+    suit, rank = card
+    if rank == '10':
+        rank_str = "10"
+    else:
+        rank_str = rank.ljust(2)  # Adjusting for alignment
+
+    card_str = (
+        f"-----\n"
+        f"| {rank_str}|\n"
+        f"| {suit} |\n"
+        f"-----"
+    )
+    return card_str
+
+def print_hand(hand, hidden=False):
+    if hidden:
+        card_strs = [print_card(hand[1])]  # Only show the second card (hidden)
+        card_strs.insert(0, "-----\n| Hidden Card |")
+    else:
+        card_strs = [print_card(card) for card in hand]
     
-    def take_turn(self, deck):
-        while True:
-            print(f"Your hand:\n{self.show_hand()}\nTotal value: {self.total_value()}")
-            action = input("Choose action: (h)it, (s)tand: ").lower()
-            
+    card_rows = [card.split('\n') for card in card_strs]
+
+    spacing = 2
+    
+    lines = []
+    for i in range(len(card_rows[0])):
+        line = ""
+        for row in card_rows:
+            line += row[i].ljust(len(row[i]) + spacing)
+        lines.append(line.rstrip())
+    
+    return "\n".join(lines)
+
+def print_header(text):
+    print(f"\n{'='*len(text)}\n{text}\n{'='*len(text)}")
+
+def print_game_state(player_hand, dealer_hand, is_dealer_hidden=True):
+    print_header("Your Hand")
+    print(print_hand(player_hand))
+    print(f"Value: {hand_value(player_hand)}\n")
+    
+    if is_dealer_hidden:
+        print_header("Dealer's Hand")
+        print(print_hand([dealer_hand[0], ('?', '?')]))  # Dealer's hidden card
+    else:
+        print_header("Dealer's Hand")
+        print(print_hand(dealer_hand, hidden=False))
+        print(f"Value: {hand_value(dealer_hand)}\n")
+
+def blackjack_game():
+    money = 1000
+    print_header("Welcome to Blackjack!")
+
+    while money > 0:
+        deck = create_deck()
+        random.shuffle(deck)
+        player_hand = initial_deal(deck)
+        dealer_hand = initial_deal(deck)
+
+        bet = int(input(f"You have ${money}. Enter your bet: "))
+        if bet > money:
+            print("Bet cannot be more than your current money.")
+            continue
+
+        print_game_state(player_hand, dealer_hand)
+
+        # Player's turn
+        while hand_value(player_hand) < 21:
+            action = input("Do you want to (h)it, (s)tand, or (d)ouble down? ").lower()
             if action == 'h':
-                self.add_card(deck.deal())
-                if self.total_value() > 21:
-                    print(f"Busted! Your hand value: {self.total_value()}")
-                    break
+                player_hand.append(draw_card(deck))
+                print_game_state(player_hand, dealer_hand, is_dealer_hidden=True)
             elif action == 's':
                 break
+            elif action == 'd':
+                bet *= 2
+                player_hand.append(draw_card(deck))
+                print_game_state(player_hand, dealer_hand, is_dealer_hidden=True)
+                break
             else:
-                print("Invalid action. Please choose 'h' to hit or 's' to stand.")
+                print("Invalid input. Please enter 'h', 's', or 'd'.")
 
-def test_cards():
-    suits = ['Hearts', 'Diamonds', 'Clubs', 'Spades']
-    values = ['2', '5', '9', 'J', 'Q', 'K', 'A', '10']
-    
-    cards = [Card(suit, value) for suit in suits for value in values]  # Sample 8 cards
-    
-    for card in cards:
-        print(card.display())
+        if hand_value(player_hand) > 21:
+            print_header("Player Busts!")
+            print_game_state(player_hand, dealer_hand, is_dealer_hidden=False)
+            money -= bet
+        else:
+            # Dealer's turn
+            print_game_state(player_hand, dealer_hand, is_dealer_hidden=False)
+            while hand_value(dealer_hand) < 17:
+                dealer_hand.append(draw_card(deck))
+                print_game_state(player_hand, dealer_hand, is_dealer_hidden=False)
 
-def test_deck():
-    deck = Deck()
-    print("Deck shuffled. Dealing cards...\n")
-    for _ in range(5):  # Deal 5 cards to test
-        card = deck.deal()
-        print(card.display())
+            # Determine winner
+            player_value = hand_value(player_hand)
+            dealer_value = hand_value(dealer_hand)
 
-def test_player():
-    deck = Deck()
-    player = Player()
-    
-    player.add_card(deck.deal())
-    player.add_card(deck.deal())
-    
-    print("Player's turn:")
-    player.take_turn(deck)
-    print(f"Final hand:\n{player.show_hand()}\nTotal value: {player.total_value()}")
+            if dealer_value > 21 or player_value > dealer_value:
+                print_header("Player Wins!")
+                money += bet
+            elif player_value < dealer_value:
+                print_header("Dealer Wins!")
+                money -= bet
+            else:
+                print_header("It's a Tie!")
+
+        # Display user's money after the round
+        print(f"Your current balance: ${money}")
+
+        if money > 0:
+            if input("Do you want to play again? (y/n) ").lower() != 'y':
+                break
+
+    print_header(f"Game Over! You ended with ${money}")
 
 if __name__ == "__main__":
-    #test_cards()
-    #test_deck()
-    test_player()
+    blackjack_game()
